@@ -50,6 +50,7 @@ function Dashboard({ onTabChange }) {
                   <h4 className='fw-bold'>Create Event</h4>
               </button>
           </div>
+          
         </div>
     </div>
    );

@@ -29,17 +29,22 @@ const Navbar = () => {
     setIsSidebarExpanded(!isSidebarExpanded);
   };
 
+  // Set page titles for all pages
   useEffect(() => {
     const titles = {
       'dashboard': 'E-Reg | Dashboard',
       'my-events': 'E-Reg | My Events',
       'create-events': 'E-Reg | Create Event',
       'org-mem': 'E-Reg | Org Members',
+      'profile': 'E-Reg | Profile',
+      'event-view': 'E-Reg | Event Details',
+      'edit-event': 'E-Reg | Edit Event',
     };
 
     document.title = titles[activeTab] || 'E-Reg';
-    }, [activeTab]);
+  }, [activeTab]);
 
+  // Handle sidebar resizing
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth <= 600) {
@@ -134,15 +139,13 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Main Content*/}
+      {/* Main Content */}
       <div className={`content-wrapper ${isSidebarExpanded ? 'expanded' : 'collapsed'}`}>
         <div className="page-area">
           {activeTab === 'dashboard' && (<Dashboard onTabChange={setActiveTab} />)}
           {activeTab === 'my-events' && (<MyEvents onTabChange={setActiveTab} />)}
           {activeTab === 'create-events' && (<CreateEvent onTabChange={setActiveTab} />)}
           {activeTab === 'org-mem' && (<OrgMembers onTabChange={setActiveTab} />)}
-
-          {/* Add more conditional renders for other pages here */}
           {activeTab === 'event-view' && (<EventView onTabChange={setActiveTab} />)}
           {activeTab === 'profile' && (<Profile onTabChange={setActiveTab} />)}
           {activeTab === 'edit-event' && (<EditEvent onTabChange={setActiveTab} />)}
