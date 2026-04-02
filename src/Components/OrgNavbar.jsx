@@ -1,6 +1,8 @@
-// src/Components/Navbar.jsx
 import React, { useState, useEffect } from 'react';
+import '../Styles/Navbar.css';
 import logo from '../img/logo/E-Reg.png';
+
+// Import your icon images
 import dashboardIcon from '../img/icons/dashboard.png';
 import eventsIcon from '../img/icons/events.png';
 import createIcon from '../img/icons/create.png';
@@ -23,11 +25,26 @@ const Navbar = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
+  const menuItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: dashboardIcon },
+    { id: 'my-events', label: 'My Events', icon: eventsIcon },
+    { id: 'create-events', label: 'Create Event', icon: createIcon },
+    { id: 'org-mem', label: 'Org Members', icon: membersIcon },
+  ];
+
   const toggleSidebar = () => {
     setIsSidebarExpanded(!isSidebarExpanded);
   };
 
-  // Set page titles dynamically
+  const handleLinkClick = (tab) => {
+    setActiveTab(tab);
+    if (window.innerWidth <= 600) setIsSidebarExpanded(false);
+  };
+
+  const toggleNotification = () => {
+    setIsNotificationOpen(prev => !prev);
+  };
+
   useEffect(() => {
     const titles = {
       'dashboard': 'E-Reg | Dashboard',
@@ -41,69 +58,49 @@ const Navbar = () => {
     document.title = titles[activeTab] || 'E-Reg';
   }, [activeTab]);
 
-  // Handle sidebar resizing
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth <= 600) {
-        setIsSidebarExpanded(false);
-      } else if (window.innerWidth > 1200) {
-        setIsSidebarExpanded(true);
-      }
+      if (window.innerWidth <= 600) setIsSidebarExpanded(false);
+      else if (window.innerWidth > 1200) setIsSidebarExpanded(true);
     };
     window.addEventListener('resize', handleResize);
     handleResize();
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const handleLinkClick = (tab) => {
-    setActiveTab(tab);
-    if (window.innerWidth <= 600) setIsSidebarExpanded(false);
-  };
-
-  const toggleNotification = () => {
-    setIsNotificationOpen(prev => !prev);
-  };
-
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: dashboardIcon },
-    { id: 'my-events', label: 'My Events', icon: eventsIcon },
-    { id: 'create-events', label: 'Create Event', icon: createIcon },
-    { id: 'org-mem', label: 'Org Members', icon: membersIcon },
-  ];
-
   return (
     <>
       {/* Top Navbar */}
-      <nav className="top-navbar d-flex justify-content-between align-items-center p-2">
-        <div className="d-flex align-items-center">
+      <nav className="top-navbar">
+        <div className="navbar-left">
           <button 
-            className="sidebar-toggle-top btn btn-link"
+            className="sidebar-toggle-top" 
             onClick={toggleSidebar}
             aria-label="Toggle sidebar"
           >
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <line x1="4" y1="6" x2="20" y2="6" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round"/>
               <line x1="4" y1="12" x2="20" y2="12" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round"/>
               <line x1="4" y1="18" x2="20" y2="18" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round"/>
             </svg>
           </button>
-          <img src={logo} alt="E-Reg Logo" className="navbar-logo-img me-2" style={{ height: '35px' }} />
-          <span className="navbar-title fw-bold">E-Reg</span>
+          <img src={logo} alt="E-Reg Logo" className="navbar-logo-img" />
+          <span className="navbar-title">E-Reg</span>
         </div>
 
-        <div className="d-flex align-items-center">
-          <h3 className="me-3">ORG NAME</h3>
+        <div className="navbar-right">
+          <h3 className="navbar-btn">ORG NAME</h3>
 
-          <button className="profile-container btn btn-link me-2" onClick={() => setActiveTab('profile')}>
-            <img src={profileIcon} alt="Profile" className="prof-icon-img" style={{ height: '30px' }} />
+          <button className="profile-container" onClick={() => setActiveTab('profile')}>
+            <img src={profileIcon} alt="Profile" className="prof-icon-img" />
           </button>
 
           <button 
-            className={`notification-btn btn btn-link position-relative ${isNotificationOpen ? 'active' : ''}`}
+            className={`notification-btn ${isNotificationOpen ? 'active' : ''}`}
             onClick={toggleNotification}
             aria-label="Notifications"
           >
-            <img src={notificationIcon} alt="Notification" style={{ height: '30px' }} />
+            <img src={notificationIcon} alt="Notification" className="nav-icon-img" />
           </button>
         </div>
       </nav>
@@ -114,55 +111,57 @@ const Navbar = () => {
         onMouseEnter={() => window.innerWidth > 1200 && setIsSidebarExpanded(true)}
         onMouseLeave={() => window.innerWidth > 1200 && setIsSidebarExpanded(false)}
       >
-        <div className="sidebar d-flex flex-column p-2">
+        <div className="sidebar">
           {menuItems.map((item) => (
             <button
               key={item.id}
-              className={`sidebar-link btn d-flex align-items-center mb-2 ${activeTab === item.id ? 'active' : ''}`}
+              className={`sidebar-link ${activeTab === item.id ? 'active' : ''}`}
               onClick={() => handleLinkClick(item.id)}
             >
-              <img src={item.icon} alt={item.label} className="sidebar-icon-img me-2" style={{ width: '24px', height: '24px' }} />
-              <span>{item.label}</span>
+              <img src={item.icon} alt={item.label} className="sidebar-icon-img" />
+              <span className="label">{item.label}</span>
             </button>
           ))}
 
           <button 
-            className="sidebar-link logout btn d-flex align-items-center mt-auto"
+            className="sidebar-link logout"
             onClick={() => console.log('Logging out...')}
           >
-            <img src={logoutIcon} alt="Logout" className="sidebar-icon-img me-2" style={{ width: '24px', height: '24px' }} />
-            <span>Log out</span>
+            <img src={logoutIcon} alt="Logout" className="sidebar-icon-img" />
+            <span className="label">Log out</span>
           </button>
         </div>
       </div>
 
       {/* Main Content */}
       <div className={`content-wrapper ${isSidebarExpanded ? 'expanded' : 'collapsed'}`}>
-        <div className="page-area p-3">
-          {activeTab === 'dashboard' && <Dashboard onTabChange={setActiveTab} />}
-          {activeTab === 'my-events' && <MyEvents onTabChange={setActiveTab} />}
-          {activeTab === 'create-events' && <CreateEvent onTabChange={setActiveTab} />}
-          {activeTab === 'org-mem' && <OrgMembers onTabChange={setActiveTab} />}
-          {activeTab === 'event-view' && <EventView onTabChange={setActiveTab} />}
-          {activeTab === 'profile' && <Profile onTabChange={setActiveTab} logo={logo} />}
-          {activeTab === 'edit-event' && <EditEvent onTabChange={setActiveTab} />}
+        <div className="page-area">
+          {activeTab === 'dashboard' && (<Dashboard onTabChange={setActiveTab} />)}
+          {activeTab === 'my-events' && (<MyEvents onTabChange={setActiveTab} />)}
+          {activeTab === 'create-events' && (<CreateEvent onTabChange={setActiveTab} />)}
+          {activeTab === 'org-mem' && (<OrgMembers onTabChange={setActiveTab} />)}
+          {activeTab === 'event-view' && (<EventView onTabChange={setActiveTab} />)}
+          {activeTab === 'profile' && (<Profile onTabChange={setActiveTab} />)}
+          {activeTab === 'edit-event' && (<EditEvent onTabChange={setActiveTab} />)}
         </div>
       </div>
 
       {/* Notification Panel */}
       {isNotificationOpen && (
-        <div className="notification-panel position-absolute top-0 end-0 bg-white shadow p-3">
-          <div className="notification-header mb-2">
-            <h5>Notifications</h5>
+        <div className="notification-panel">
+          <div className="notification-header">
+            <h3>Notifications</h3>
           </div>
           <div className="notification-body">
-            <div className="empty-notification">No new notifications yet.</div>
+            <div className="empty-notification">
+              No new notifications yet.
+            </div>
           </div>
         </div>
       )}
 
       {/* Footer */}
-      <footer className="bg-dark text-light text-center py-3 mt-3">
+      <footer className="bg-dark text-light text-center py-4">
         <p>&copy; 2023 E-Reg. All rights reserved.</p>
       </footer>
     </>
