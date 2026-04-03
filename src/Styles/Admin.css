@@ -1,0 +1,121 @@
+/* Make dashboard boxes consistent height */
+.dashboard-box {
+    height: 200px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* Improve text spacing inside boxes */
+.dashboard-box h1 {
+    font-size: 2.5rem;
+}
+
+/* Fix button shadow (yours is too harsh) */
+.create-btn {
+    box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
+}
+
+/* Button hover smooth */
+.create-btn:hover {
+    background-color: #1f1f1f;
+}
+
+/* Prevent too big zoom (yours is 1.1 = too big) */
+.btn-transform:hover {
+    transform: scale(1.05);
+}
+
+/* ---------------- Buttons ---------------- */
+.submit-button {
+    background-color: #2f2f2f;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    width: 100%;
+    font-size: 18px;
+    height: 50px;
+    transition: 0.3s;
+}
+
+.submit-button:hover {
+    transform: scale(1.05);
+}
+
+.create-btn {
+    background-color: #2f2f2f;
+    color: white;
+    border-radius: 10px;
+    box-shadow: 3px 5px #888888;
+    transition: 0.3s;
+}
+
+.create-btn:hover {
+    transform: scale(1.05);
+}
+
+/* ---------------- Form Boxes ---------------- */
+.form-box {
+    border-radius: 20px;
+    background-color: #fff;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+/* ---------------- Member / Student Box ---------------- */
+.member-box {
+    background-color: #fff;
+    border-radius: 15px;
+    padding: 15px;
+    overflow-x: auto;
+}
+
+/* ---------------- Table Header ---------------- */
+.header-row {
+    font-weight: bold;
+    background-color: #850101;
+    color: white;
+    border-radius: 10px;
+    padding: 10px 5px;
+    margin-bottom: 5px;
+}
+
+/* ---------------- Table Body ---------------- */
+.body-row {
+    padding: 10px 5px;
+    margin-bottom: 5px;
+    background-color: #f8f8f8;
+    border-radius: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* ---------------- Column Spacing ---------------- */
+.body-row div, .header-row div {
+    padding: 0 10px;
+}
+
+/* Adjust columns for md+ screens */
+@media(min-width: 768px) {
+    .body-row div, .header-row div {
+        padding: 0 15px;
+    }
+}
+
+/* ---------------- Dropdown ---------------- */
+.dropdown-toggle {
+    width: 100%;
+}
+
+/* Sticky header for better scrolling */
+.member-box .header-row {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.bg-red {
+    background-color: #850101;
+    color: white;
+}
