@@ -1,4 +1,4 @@
-// src/Pages/Student.jsx
+// src/Pages/Admin/Student.jsx
 import React, { useState, useEffect } from 'react';
 import '../../Styles/Admin.css';
 import * as XLSX from 'xlsx';
@@ -6,303 +6,321 @@ import { supabase } from '../../supabaseClient';
 
 function Student() {
   const [students, setStudents] = useState([]);
+  const [generatedCredentials, setGeneratedCredentials] = useState([]); 
   const [formData, setFormData] = useState({
-    studentId: '',
-    name: '',
-    department: '',
-    year: '',
-    section: '',
-    organization: ''
+    studentId: '', name: '', department: '', year: '', section: '', organization: ''
   });
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [showAddConfirm, setShowAddConfirm] = useState(false);
+  const [showProcessingModal, setShowProcessingModal] = useState(false); 
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [loading, setLoading] = useState(false);
 
-  // EMAIL FORMAT: first letter of first name + full last name + 3 digits + @ereg.com
-  const generateEmail = (fullName) => {
-    if (!fullName) return '';
-    const parts = fullName.trim().toLowerCase().split(' ');
-    const firstLetter = parts[0]?.charAt(0) || '';
-    const lastName = parts.slice(1).join('') || '';
-    const randomNum = Math.floor(100 + Math.random() * 900);
-    return `${firstLetter}${lastName}${randomNum}@ereg.com`;
+  const generateEmail = (name) => {
+    const cleanName = name.toLowerCase().replace(/\s+/g, '');
+    const randomNums = Math.floor(100 + Math.random() * 900); 
+    return `${cleanName}${randomNums}@ereg.com`;
   };
 
-  // Fetch all students from database
+  const generatePassword = () => Math.random().toString(36).slice(-8);
+
   useEffect(() => {
     fetchStudents();
   }, []);
 
   const fetchStudents = async () => {
-    const { data, error } = await supabase.from('student').select('*').order('id', { ascending: true });
-    if (error) console.log(error);
+    const { data, error } = await supabase
+      .from('student')
+      .select(`profile_id, name, department, year_level, section, organization_id, account:account_id(email)`)
+      .order('profile_id', { ascending: true });
+    
+    if (error) console.error(error);
     else setStudents(data.map(s => ({
-      id: s.id,
-      studentId: s.student_id,
+      id: s.profile_id,
+      studentId: s.profile_id,
       name: s.name,
       department: s.department,
-      year: s.year,
+      year: s.year_level,
       section: s.section,
-      organization: s.organization || 'None'
+      organization: s.organization_id || 'None',
+      email: s.account?.email || ''
     })));
   };
 
-  // Excel Upload → insert to DB
+  const processCreation = async (studentObj) => {
+    const email = generateEmail(studentObj.name);
+    const password = generatePassword();
+    
+    const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+    if (authError) throw authError;
+
+    const { data: accData, error: accError } = await supabase
+      .from('account')
+      .insert([{ auth_id: authData.user.id, email: email, role: 'student', password: password }])
+      .select().single();
+    if (accError) throw accError;
+
+    const { error: studError } = await supabase
+      .from('student')
+      .insert([{
+        profile_id: parseInt(studentObj.studentId),
+        name: studentObj.name,
+        department: studentObj.department,
+        year_level: studentObj.year ? parseInt(studentObj.year) : null,
+        section: studentObj.section,
+        organization_id: (studentObj.organization && studentObj.organization !== 'None') ? parseInt(studentObj.organization) : null,
+        account_id: accData.account_id
+      }]);
+    if (studError) throw studError;
+
+    setGeneratedCredentials(prev => [...prev, { 
+      studentId: studentObj.studentId, name: studentObj.name, email, password 
+    }]);
+  };
+
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
+    setShowProcessingModal(true);
     const reader = new FileReader();
     reader.onload = async (evt) => {
       const data = new Uint8Array(evt.target.result);
       const workbook = XLSX.read(data, { type: 'array' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-      const formattedData = jsonData.map(row => ({
-        student_id: row['Student ID'],
-        name: row['Student Name'],
-        department: row['Department'],
-        year: row['Year Level'],
-        section: row['Section'],
-        organization: row['Organization'] || 'None'
-      }));
-
-      const { error } = await supabase.from('student').insert(formattedData);
-      if (error) console.log(error);
-      else fetchStudents();
+      const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+      for (const row of jsonData) {
+        try {
+          await processCreation({
+            studentId: row["Student ID"],
+            name: row["Student Name"],
+            department: row["Department"],
+            year: row["Year Level"],
+            section: row["Section"],
+            organization: row["Organization ID"]
+          });
+        } catch (err) { console.error(err); }
+      }
+      await fetchStudents();
+      setShowProcessingModal(false);
     };
-
     reader.readAsArrayBuffer(file);
   };
 
-  // Input change handler
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const downloadCurrentTable = () => {
+    if (generatedCredentials.length === 0) return;
+    const worksheet = XLSX.utils.json_to_sheet(generatedCredentials);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Credentials");
+    XLSX.writeFile(workbook, "Student_Credentials.xlsx");
   };
 
-  // Add student (show confirmation modal)
-  const handleAddStudent = (e) => {
-    e.preventDefault();
-    const { studentId, name, department, year, section } = formData;
-    if (!studentId || !name || !department || !year || !section) {
-      alert('Please fill all required fields');
-      return;
-    }
-    setShowAddConfirm(true);
-  };
-
-  // Confirm add → insert into DB
   const confirmAddStudent = async () => {
-    const { studentId, name, department, year, section, organization } = formData;
-
-    const { error } = await supabase.from('student').insert([{
-      student_id: studentId,
-      name,
-      department,
-      year,
-      section,
-      organization: organization || 'None'
-    }]);
-
-    if (error) console.log(error);
-    else fetchStudents();
-
-    setFormData({ studentId:'', name:'', department:'', year:'', section:'', organization:'' });
-    setShowAddConfirm(false);
+    setLoading(true);
+    try {
+      await processCreation(formData);
+      await fetchStudents();
+      setFormData({ studentId: '', name: '', department: '', year: '', section: '', organization: '' });
+      setShowAddConfirm(false);
+    } catch (err) { alert(err.message); }
+    finally { setLoading(false); }
   };
 
-  // Edit / Save
   const handleEditSave = async () => {
     const { error } = await supabase.from('student').update({
-      student_id: selectedStudent.studentId,
+      profile_id: parseInt(selectedStudent.studentId),
       name: selectedStudent.name,
       department: selectedStudent.department,
-      year: selectedStudent.year,
+      year_level: parseInt(selectedStudent.year),
       section: selectedStudent.section,
-      organization: selectedStudent.organization
-    }).eq('id', selectedStudent.id);
-
-    if (error) console.log(error);
-    else fetchStudents();
-    setSelectedStudent(null);
+      organization_id: (selectedStudent.organization && selectedStudent.organization !== 'None') ? parseInt(selectedStudent.organization) : null
+    }).eq('profile_id', selectedStudent.id);
+    
+    if (error) alert(error.message);
+    else { fetchStudents(); setSelectedStudent(null); }
   };
 
-  // Delete
   const handleDelete = async () => {
-    const { error } = await supabase.from('student').delete().eq('id', selectedStudent.id);
-    if (error) console.log(error);
-    else fetchStudents();
-    setSelectedStudent(null);
+    if (!selectedStudent) return;
+    setLoading(true);
+    const { error } = await supabase.from('student').delete().eq('profile_id', selectedStudent.id);
+    if (!error) {
+      await fetchStudents();
+      const modalInstance = window.bootstrap?.Modal.getInstance(document.getElementById('deleteModal'));
+      modalInstance?.hide();
+      setSelectedStudent(null);
+    }
+    setLoading(false);
   };
 
-  // SEARCH
-  const filteredStudents = students.filter(s =>
-    Object.values(s).some(val =>
-      val?.toString().toLowerCase().includes(searchTerm.toLowerCase())
-    )
+  const sortedStudents = [...students].filter(s =>
+    Object.values(s).some(val => val?.toString().toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  // SORT
-  const sortedStudents = [...filteredStudents].sort((a, b) => {
-    if (!sortConfig.key) return 0;
-    let valA = a[sortConfig.key];
-    let valB = b[sortConfig.key];
-    if (typeof valA === 'string') valA = valA.toLowerCase();
-    if (typeof valB === 'string') valB = valB.toLowerCase();
-    if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  const requestSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
-    setSortConfig({ key, direction });
-  };
-
-  // Download table with email + random password
-  const downloadCurrentTable = () => {
-    const exportData = sortedStudents.map(s => ({
-      'Student ID': s.studentId,
-      'Name': s.name,
-      'Section': s.section,
-      'Email': generateEmail(s.name),
-      'Password': Math.random().toString(36).slice(-6)
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
-    XLSX.writeFile(workbook, 'Students.xlsx');
-  };
-
-  // ❗ YOUR DESIGN REMAINS EXACTLY THE SAME BELOW
   return (
-    <div className="container-fluid">
+    <div className="container-fluid py-4">
       <h2 className="fw-bold mb-3">Student Management</h2>
       <div className="row">
-        {/* Left Column */}
         <div className="col-lg-4 col-md-12">
-          <div className="form-box shadow mb-3">
-            <h4 className="fw-bold mb-3">Upload Excel</h4>
+          <div className="form-box shadow mb-3 p-3 bg-white rounded">
+            <h4 className="fw-bold mb-1">Import Data</h4>
             <input type="file" accept=".xlsx,.xls" className="form-control mb-2" onChange={handleFileUpload} />
-            <p className="text-muted">
-              Excel columns: Student ID, Student Name, Department, Year Level, Section, Organization (optional)
-            </p>
+            <button className="btn btn-outline-primary btn-sm w-100" onClick={() => {}}>Download Template</button>
           </div>
 
-          <div className="form-box shadow">
-            <h4 className="fw-bold mb-3">Add Student Individually</h4>
-            <form>
-              {['studentId','name','department','year','section','organization'].map(f => (
-                <div className="mb-2" key={f}>
-                  <label className="form-label">{f.charAt(0).toUpperCase()+f.slice(1)}</label>
-                  <input
-                    type="text"
-                    name={f}
-                    className="form-control"
-                    value={formData[f]}
-                    onChange={handleInputChange}
-                    placeholder={f === 'organization' ? 'Organization (Optional)' : f.charAt(0).toUpperCase() + f.slice(1)}
-                    required={f !== 'organization'}
-                  />
-                </div>
-              ))}
-              <button
-                type="button"
-                className="submit-button mt-2 w-100"
-                onClick={handleAddStudent}
-              >
-                Add Student
-              </button>
+          <div className="form-box shadow p-3 bg-white rounded">
+            <h4 className="fw-bold mb-3">Manual Registration</h4>
+            <form onSubmit={(e) => { e.preventDefault(); setShowAddConfirm(true); }}>
+              <input type="number" placeholder="Student ID" className="form-control mb-2" value={formData.studentId} onChange={(e) => setFormData({...formData, studentId: e.target.value})} required />
+              <input type="text" placeholder="Full Name" className="form-control mb-2" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required />
+              <input type="text" placeholder="Department" className="form-control mb-2" value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} required />
+              <div className="row g-2">
+                <div className="col-6"><input type="number" placeholder="Year" className="form-control mb-2" value={formData.year} onChange={(e) => setFormData({...formData, year: e.target.value})} required /></div>
+                <div className="col-6"><input type="text" placeholder="Section" className="form-control mb-2" value={formData.section} onChange={(e) => setFormData({...formData, section: e.target.value})} required /></div>
+              </div>
+              <button type="submit" className="submit-button mt-2 w-100">Register Student</button>
             </form>
           </div>
         </div>
 
-        {/* Right Column */}
-        <div className="col-lg-8 col-md-12 mt-3 mt-lg-0">
-          <div className="member-box bg-red">
-            <div className="mb-2 d-flex gap-2">
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Search by any field..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-              />
-              <button className="btn btn-success" onClick={downloadCurrentTable}>Download Table</button>
+        <div className="col-lg-8 col-md-12">
+          <div className="member-box bg-red p-3 rounded shadow">
+            <div className="mb-2 d-flex flex-column flex-sm-row gap-2">
+              <input type="text" className="form-control" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              <button className="btn btn-success text-nowrap" onClick={downloadCurrentTable} disabled={generatedCredentials.length === 0}>
+                Download Credentials ({generatedCredentials.length})
+              </button>
             </div>
 
-            {/* Table Header */}
-            <div className="header-row text-center d-flex justify-content-center gap-2 bg-dark">
-              <div className="d-none d-lg-block col-lg-1" onClick={() => requestSort('studentId')}>ID</div>
-              <div className="col-6 col-lg-2" onClick={() => requestSort('name')}>Name</div>
-              <div className="d-none d-lg-block col-lg-2" onClick={() => requestSort('department')}>Department</div>
-              <div className="d-none d-lg-block col-lg-1" onClick={() => requestSort('year')}>Year</div>
-              <div className="d-none d-lg-block col-lg-1" onClick={() => requestSort('section')}>Section</div>
-              <div className="d-none d-lg-block col-lg-2" onClick={() => requestSort('organization')}>Organization</div>
-              <div className="col-6 col-lg-2">Actions</div>
+            <div className="header-row text-center d-flex justify-content-center gap-2 bg-dark text-white p-2 fw-bold">
+              <div className="d-none d-lg-block col-lg-1">ID</div>
+              <div className="col-7 col-lg-3">Name</div>
+              <div className="d-none d-lg-block col-lg-2">Dept</div>
+              <div className="d-none d-lg-block col-lg-1">Year</div>
+              <div className="d-none d-lg-block col-lg-1">Sec</div>
+              <div className="col-5 col-lg-2 text-end">Actions</div>
             </div>
 
-            {/* Table Body */}
-            {sortedStudents.length === 0 ? (
-              <div className="text-center py-3">No students found.</div>
-            ) : (
-              sortedStudents.map(s => (
-                <div key={s.id} className="body-row text-center d-flex justify-content-center gap-2">
-                  <div className="col-6 d-md-block d-lg-none">{s.name}</div>
-                  <div className="d-none d-lg-block col-lg-1">{s.studentId}</div>
-                  <div className="d-none d-lg-block col-lg-2">{s.name}</div>
-                  <div className="d-none d-lg-block col-lg-2">{s.department}</div>
-                  <div className="d-none d-lg-block col-lg-1">{s.year}</div>
-                  <div className="d-none d-lg-block col-lg-1">{s.section}</div>
-                  <div className="d-none d-lg-block col-lg-2">{s.organization}</div>
-                  <div className="col-5 col-lg-2">
-                    <div className="dropdown w-100">
-                      <button className="btn dropdown-toggle w-100" type="button" data-bs-toggle="dropdown">
-                        Actions
-                      </button>
-                      <ul className="dropdown-menu">
-                        <li><button className="dropdown-item" data-bs-toggle="modal" data-bs-target="#viewModal" onClick={() => setSelectedStudent(s)}>View</button></li>
-                        <li><button className="dropdown-item" data-bs-toggle="modal" data-bs-target="#editModal" onClick={() => setSelectedStudent({...s})}>Edit</button></li>
-                        <li><button className="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#deleteModal" onClick={() => setSelectedStudent(s)}>Delete</button></li>
-                      </ul>
-                    </div>
+            {sortedStudents.map(s => (
+              <div key={s.id} className="body-row text-center d-flex justify-content-center gap-2 border-bottom p-2 align-items-center bg-white">
+                <div className="d-none d-lg-block col-lg-1">{s.studentId}</div>
+                <div className="col-5 col-lg-3 text-truncate">{s.name}</div>
+                <div className="d-none d-lg-block col-lg-2">{s.department}</div>
+                <div className="d-none d-lg-block col-lg-1">{s.year}</div>
+                <div className="d-none d-lg-block col-lg-1">{s.section}</div>
+                <div className="col-4 col-lg-2 text-end">
+                  <div className="dropdown w-100">
+                    <button className="btn dropdown-toggle w-100 btn-sm border" type="button" data-bs-toggle="dropdown">Action</button>
+                    <ul className="dropdown-menu shadow">
+                      {/* RESTORED DROPDOWN ACTIONS */}
+                      <li className="d-block d-lg-none">
+                        <button className="dropdown-item" data-bs-toggle="modal" data-bs-target="#viewModal" onClick={() => setSelectedStudent(s)}>View Details</button>
+                      </li>
+                      <li><button className="dropdown-item" data-bs-toggle="modal" data-bs-target="#editModal" onClick={() => setSelectedStudent({...s})}>Edit All Fields</button></li>
+                      <li><button className="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#deleteModal" onClick={() => setSelectedStudent(s)}>Delete</button></li>
+                    </ul>
                   </div>
                 </div>
-              ))
-            )}
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Add Student Confirmation Modal */}
+      {/* --- MODALS --- */}
+
+      {/* View Modal */}
+      <div className="modal fade" id="viewModal" tabIndex="-1">
+        <div className="modal-dialog modal-dialog-centered">
+          <div className="modal-content">
+            <div className="modal-header"><h5>Quick Info</h5><button className="btn-close" data-bs-dismiss="modal"></button></div>
+            <div className="modal-body text-start">
+              {selectedStudent && (
+                <>
+                  <p><strong>ID:</strong> {selectedStudent.studentId}</p>
+                  <p><strong>Name:</strong> {selectedStudent.name}</p>
+                  <p><strong>Department:</strong> {selectedStudent.department}</p>
+                  <p><strong>Email:</strong> {selectedStudent.email}</p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Edit Modal */}
+      <div className="modal fade" id="editModal" tabIndex="-1">
+        <div className="modal-dialog modal-dialog-centered">
+          <div className="modal-content">
+            <div className="modal-header fw-bold"><h5>Edit Master Record</h5><button className="btn-close" data-bs-dismiss="modal"></button></div>
+            <div className="modal-body">
+              {selectedStudent && (
+                <>
+                  <label className="small fw-bold">Student ID</label>
+                  <input type="number" className="form-control mb-2" value={selectedStudent.studentId} onChange={e => setSelectedStudent({...selectedStudent, studentId: e.target.value})} />
+                  <label className="small fw-bold">Full Name</label>
+                  <input type="text" className="form-control mb-2" value={selectedStudent.name} onChange={e => setSelectedStudent({...selectedStudent, name: e.target.value})} />
+                  <label className="small fw-bold">Department</label>
+                  <input type="text" className="form-control mb-2" value={selectedStudent.department} onChange={e => setSelectedStudent({...selectedStudent, department: e.target.value})} />
+                  <div className="row g-2 mb-2">
+                    <div className="col-6"><label className="small fw-bold">Year</label><input type="number" className="form-control" value={selectedStudent.year} onChange={e => setSelectedStudent({...selectedStudent, year: e.target.value})} /></div>
+                    <div className="col-6"><label className="small fw-bold">Section</label><input type="text" className="form-control" value={selectedStudent.section} onChange={e => setSelectedStudent({...selectedStudent, section: e.target.value})} /></div>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="modal-footer border-0">
+              <button className="btn btn-primary w-100" data-bs-dismiss="modal" onClick={handleEditSave}>Update Everything</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Excel Processing Overlay */}
+      {showProcessingModal && (
+        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1060 }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content text-center p-5 border-0 shadow-lg">
+              <div className="spinner-border text-primary mb-3 mx-auto"></div>
+              <h4 className="fw-bold">Processing...</h4>
+              <p className="text-muted mb-0">Bulk registering with @ereg.com emails.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Add Confirmation */}
       {showAddConfirm && (
-        <>
-          <div className="modal-backdrop fade show"></div>
-          <div className="modal show d-block" tabIndex="-1" style={{ zIndex: 1055 }}>
-            <div className="modal-dialog modal-dialog-centered">
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h5 className="modal-title">Confirm Add Student</h5>
-                  <button className="btn-close" onClick={() => setShowAddConfirm(false)}></button>
-                </div>
-                <div className="modal-body">
-                  <p>Are you sure you want to add <strong>{formData.name}</strong>?</p>
-                </div>
-                <div className="modal-footer">
-                  <button className="btn btn-secondary" onClick={() => setShowAddConfirm(false)}>Cancel</button>
-                  <button className="btn btn-primary" onClick={confirmAddStudent}>Confirm</button>
+        <div className="modal show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content shadow border-0">
+              <div className="modal-body py-4 text-center">
+                <h5 className="fw-bold">Confirm Registration</h5>
+                <p>Register <strong>{formData.name}</strong>?</p>
+                <div className="d-flex gap-2 justify-content-center mt-3">
+                  <button className="btn btn-light px-4" onClick={() => setShowAddConfirm(false)}>Cancel</button>
+                  <button className="btn btn-primary px-4" onClick={confirmAddStudent}>Confirm</button>
                 </div>
               </div>
             </div>
           </div>
-        </>
+        </div>
       )}
 
+      {/* Delete Confirmation */}
+      <div className="modal fade" id="deleteModal" tabIndex="-1">
+        <div className="modal-dialog modal-dialog-centered">
+          <div className="modal-content border-0 shadow">
+            <div className="modal-body text-center p-4">
+              <h5 className="fw-bold">Delete Record?</h5>
+              <p>Permanently remove <strong>{selectedStudent?.name}</strong>?</p>
+              <div className="d-flex gap-2 justify-content-center mt-3">
+                <button className="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+                <button className="btn btn-danger px-4" onClick={handleDelete}>Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
