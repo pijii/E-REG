@@ -1,4 +1,3 @@
-import '../Styles/Navbar.css';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import logo from '../img/logo/E-Reg.png';
@@ -13,7 +12,7 @@ import defaultProfileIcon from '../img/icons/profile.png';
 import notificationIcon from '../img/icons/bell.png';
 import logoutIcon from '../img/icons/logout.png';
 
-// Admin Pages
+// Pages
 import Dashboard from '../Pages/Admin/Dashboard';
 import Students from '../Pages/Admin/Student';
 import OrgCreate from '../Pages/Admin/OrgCreate';
@@ -27,7 +26,7 @@ const AdminNavbar = () => {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false); // new state for modal
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: dashboardIcon },
@@ -39,11 +38,10 @@ const AdminNavbar = () => {
 
   const adminProfile = user?.profile;
   const account = user?.account;
-
   const adminName = adminProfile?.name || account?.email || 'Administrator';
   const profileImage = adminProfile?.profile_img || defaultProfileIcon;
 
-  const toggleSidebar = () => setIsSidebarExpanded(!isSidebarExpanded);
+  const toggleSidebar = () => setIsSidebarExpanded(prev => !prev);
 
   const handleLinkClick = (tab) => {
     setActiveTab(tab);
@@ -54,7 +52,7 @@ const AdminNavbar = () => {
 
   const handleLogout = async () => {
     await logout();
-    window.location.href = '/E-REG';
+    window.location.href = '/';
   };
 
   useEffect(() => {
@@ -97,22 +95,16 @@ const AdminNavbar = () => {
 
         <div className="navbar-right">
           <h3 className="navbar-btn">{adminName}</h3>
-          <button 
-            className="profile-container" 
-            onClick={() => setActiveTab('profile')}
-          >
+          <button className="profile-container" onClick={() => setActiveTab('profile')}>
             <img
               src={profileImage}
               alt="Admin Profile"
               className="prof-icon-img"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = defaultProfileIcon;
-              }}
+              onError={(e) => { e.target.onerror = null; e.target.src = defaultProfileIcon; }}
             />
           </button>
-          <button 
-            className={`notification-btn ${isNotificationOpen ? 'active' : ''}`} 
+          <button
+            className={`notification-btn ${isNotificationOpen ? 'active' : ''}`}
             onClick={toggleNotification}
           >
             <img src={notificationIcon} alt="Notification" className="nav-icon-img" />
@@ -121,13 +113,11 @@ const AdminNavbar = () => {
       </nav>
 
       {/* Sidebar */}
-      <div 
-        className={`sidebar-wrapper ${isSidebarExpanded ? 'expanded' : 'collapsed'}`}
-      >
+      <div className={`sidebar-wrapper ${isSidebarExpanded ? 'expanded' : 'collapsed'}`}>
         <div className="sidebar">
           {menuItems.map(item => (
-            <button 
-              key={item.id} 
+            <button
+              key={item.id}
               className={`sidebar-link ${activeTab === item.id ? 'active' : ''}`}
               onClick={() => handleLinkClick(item.id)}
             >
@@ -137,9 +127,9 @@ const AdminNavbar = () => {
           ))}
 
           {/* Logout */}
-          <button 
-            className="sidebar-link logout" 
-            onClick={() => setIsLogoutModalOpen(true)} // open modal instead of direct logout
+          <button
+            className="sidebar-link logout"
+            onClick={() => setIsLogoutModalOpen(true)}
           >
             <img src={logoutIcon} alt="Logout" className="sidebar-icon-img" />
             <span className="label">Log out</span>
