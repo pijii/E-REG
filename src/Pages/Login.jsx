@@ -58,7 +58,7 @@ const Login = () => {
   return (
     <div className="login-container d-flex flex-column min-vh-100">
       <div className="container-fluid flex-grow-1">
-        <div className="row flex-column flex-lg-row">
+        <div className="row flex-column flex-lg-row p-lg-4">
           {/* Logo Section */}
           <div className="brand-section col-12 col-lg-6 d-flex flex-column align-items-center justify-content-center">
             <img src={logo} alt="E-Reg Logo" className="brand-logo" />
@@ -105,7 +105,7 @@ const Login = () => {
                       onChange={(e) => setSchool(e.target.value)}
                       required
                     >
-                      <option value="">Select your school</option>
+                      <option value="" disabled hidden selected>Select your school</option>
                       {schools.map((s) => (
                         <option key={s.school_id} value={s.school_id}>{s.name}</option>
                       ))}
