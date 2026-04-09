@@ -66,7 +66,7 @@ const Login = () => {
           </div>
 
           {/* Login Form */}
-          <div className="col-12 col-lg-6 d-flex justify-content-center align-items-center">
+          <div className="col-12 col-lg-6 d-flex justify-content-center align-items-center my-5 my-lg-0">
             <div className="hero-wrapper w-100 p-4">
               <div className="login-card">
                 <h2>Login</h2>
