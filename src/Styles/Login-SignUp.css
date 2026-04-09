@@ -1,0 +1,128 @@
+/* ========================= */
+/* BASE LAYOUT */
+/* ========================= */
+
+.login-container {
+  min-height: 100vh;
+}
+
+/* LEFT SIDE (LOGO) */
+.brand-section {
+  background-color: transparent;
+  color: #850101;
+  min-height: 100vh;
+  padding: 2rem;
+  text-align: center;
+}
+
+.brand-logo {
+  width: 280px;
+  margin-bottom: 1.5rem;
+}
+
+.brand-title {
+  font-weight: 900;
+  font-size: 5rem;
+  letter-spacing: -2px;
+  margin: 0;
+  color: #850101;
+}
+
+/* RIGHT SIDE (FORM BACKGROUND) */
+.hero-wrapper {
+  background-color: #850101;
+  border-radius: 20px;
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px; /* keeps red box spacing */
+}
+
+/* LOGIN CARD */
+.login-card {
+  background: #fff;
+  padding: 2rem;
+  border-radius: 10px;
+  width: 100%;
+  max-width: 350px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  text-align: center;
+}
+
+.login-card h2 {
+  font-weight: bold;
+  margin-bottom: 1.5rem;
+}
+
+/* FORM */
+.form-label-custom {
+  display: block;
+  text-align: left;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}
+
+.btn-login {
+  background-color: #212121 !important;
+  border: none !important;
+  padding: 10px 0;
+  font-weight: bold;
+  color: white;
+}
+
+.btn-login:hover {
+  background-color: #000 !important;
+}
+
+.signup-link {
+  text-decoration: none;
+  color: #000;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+/* ========================= */
+/* TABLET + MOBILE */
+/* ========================= */
+
+@media (max-width: 991.98px) {
+
+  .login-container .row {
+    min-height: auto;
+  }
+
+  /* TOP RED (LOGO) */
+  .brand-section {
+    background-color: #850101 !important;
+    color: #fff !important;
+    min-height: 30vh;
+    border-radius: 0 0 20px 20px;
+  }
+
+  .brand-title {
+    color: #fff !important;
+  }
+
+  /* FORM AREA WHITE */
+  .hero-wrapper {
+    background-color: #fff !important;
+    min-height: auto;
+    border-radius: 0;
+    padding: 20px;
+  }
+
+  .login-card {
+    margin-top: -40px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+}
+
+/* FOOTER FULL WIDTH */
+footer {
+  width: 100% !important;
+  margin: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
