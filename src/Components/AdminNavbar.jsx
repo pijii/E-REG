@@ -1,7 +1,6 @@
-// src/Components/AdminNavbar.jsx
+import '../Styles/Navbar.css';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import '../Styles/Navbar.css';
 import logo from '../img/logo/E-Reg.png';
 
 // Icons
@@ -10,7 +9,7 @@ import studentsIcon from '../img/icons/student.png';
 import orgIcon from '../img/icons/members.png';
 import eventsIcon from '../img/icons/events.png';
 import reportsIcon from '../img/icons/report.png';
-import profileIcon from '../img/icons/profile.png';
+import defaultProfileIcon from '../img/icons/profile.png';
 import notificationIcon from '../img/icons/bell.png';
 import logoutIcon from '../img/icons/logout.png';
 
@@ -24,9 +23,11 @@ import Profile from '../Pages/Admin/Profile';
 
 const AdminNavbar = () => {
   const { user, logout } = useAuth();
+
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false); // new state for modal
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: dashboardIcon },
@@ -36,14 +37,26 @@ const AdminNavbar = () => {
     { id: 'reports', label: 'Reports', icon: reportsIcon },
   ];
 
+  const adminProfile = user?.profile;
+  const account = user?.account;
+
+  const adminName = adminProfile?.name || account?.email || 'Administrator';
+  const profileImage = adminProfile?.profile_img || defaultProfileIcon;
+
   const toggleSidebar = () => setIsSidebarExpanded(!isSidebarExpanded);
+
   const handleLinkClick = (tab) => {
     setActiveTab(tab);
     if (window.innerWidth <= 600) setIsSidebarExpanded(false);
   };
+
   const toggleNotification = () => setIsNotificationOpen(prev => !prev);
 
-  // Dynamic page title
+  const handleLogout = async () => {
+    await logout();
+    window.location.href = '/E-REG';
+  };
+
   useEffect(() => {
     const titles = {
       dashboard: 'E-Reg | Admin Dashboard',
@@ -56,7 +69,6 @@ const AdminNavbar = () => {
     document.title = titles[activeTab] || 'E-Reg';
   }, [activeTab]);
 
-  // Responsive sidebar
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth <= 600) setIsSidebarExpanded(false);
@@ -84,49 +96,61 @@ const AdminNavbar = () => {
         </div>
 
         <div className="navbar-right">
-          {/* Dynamic username */}
-          <h3 className="navbar-btn">{user?.profile?.name || user?.account?.email}</h3>
-
-          {/* Profile */}
-          <button className="profile-container" onClick={() => setActiveTab('profile')}>
-            <img src={profileIcon} alt="Profile" className="prof-icon-img" />
+          <h3 className="navbar-btn">{adminName}</h3>
+          <button 
+            className="profile-container" 
+            onClick={() => setActiveTab('profile')}
+          >
+            <img
+              src={profileImage}
+              alt="Admin Profile"
+              className="prof-icon-img"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = defaultProfileIcon;
+              }}
+            />
           </button>
-
-          {/* Notifications */}
-          <button className={`notification-btn ${isNotificationOpen ? 'active' : ''}`} onClick={toggleNotification}>
+          <button 
+            className={`notification-btn ${isNotificationOpen ? 'active' : ''}`} 
+            onClick={toggleNotification}
+          >
             <img src={notificationIcon} alt="Notification" className="nav-icon-img" />
           </button>
         </div>
       </nav>
 
       {/* Sidebar */}
-      <div className={`sidebar-wrapper ${isSidebarExpanded ? 'expanded' : 'collapsed'}`}
-           onMouseEnter={() => window.innerWidth > 1200 && setIsSidebarExpanded(true)}
-           onMouseLeave={() => window.innerWidth > 1200 && setIsSidebarExpanded(false)}>
+      <div 
+        className={`sidebar-wrapper ${isSidebarExpanded ? 'expanded' : 'collapsed'}`}
+      >
         <div className="sidebar">
           {menuItems.map(item => (
-            <button key={item.id} className={`sidebar-link ${activeTab === item.id ? 'active' : ''}`}
-                    onClick={() => handleLinkClick(item.id)}>
+            <button 
+              key={item.id} 
+              className={`sidebar-link ${activeTab === item.id ? 'active' : ''}`}
+              onClick={() => handleLinkClick(item.id)}
+            >
               <img src={item.icon} alt={item.label} className="sidebar-icon-img" />
               <span className="label">{item.label}</span>
             </button>
           ))}
 
           {/* Logout */}
-          <button className="sidebar-link logout" onClick={async () => {
-            await logout();
-            window.location.href = '/';
-          }}>
+          <button 
+            className="sidebar-link logout" 
+            onClick={() => setIsLogoutModalOpen(true)} // open modal instead of direct logout
+          >
             <img src={logoutIcon} alt="Logout" className="sidebar-icon-img" />
             <span className="label">Log out</span>
           </button>
         </div>
       </div>
 
-      {/* Main content */}
+      {/* Main Content */}
       <div className={`content-wrapper ${isSidebarExpanded ? 'expanded' : 'collapsed'}`}>
         <div className="page-area">
-          {activeTab === 'dashboard' && <Dashboard />}
+          {activeTab === 'dashboard' && <Dashboard onTabChange={setActiveTab} />}
           {activeTab === 'students' && <Students />}
           {activeTab === 'organizations' && <OrgCreate />}
           {activeTab === 'events' && <Events />}
@@ -135,19 +159,31 @@ const AdminNavbar = () => {
         </div>
       </div>
 
-      {/* Notification Panel */}
+      {/* Notification */}
       {isNotificationOpen && (
         <div className="notification-panel">
-          <div className="notification-header"><h3>Notifications</h3></div>
-          <div className="notification-body">
-            <div className="empty-notification">No new notifications yet.</div>
+          <h3>Notifications</h3>
+          <div>No new notifications yet.</div>
+        </div>
+      )}
+
+      {/* Logout Modal */}
+      {isLogoutModalOpen && (
+        <div className="modal-backdrop">
+          <div className="modal-content">
+            <h2>Confirm Logout</h2>
+            <p>Are you sure you want to log out?</p>
+            <div className="modal-buttons">
+              <button className="btn btn-confirm" onClick={handleLogout}>Yes, Logout</button>
+              <button className="btn btn-cancel" onClick={() => setIsLogoutModalOpen(false)}>Cancel</button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Footer */}
       <footer className="bg-dark text-light text-center py-4">
-        <p>&copy; 2023 E-Reg Admin. All rights reserved.</p>
+        <p>&copy; 2026 E-Reg Admin. All rights reserved.</p>
       </footer>
     </>
   );

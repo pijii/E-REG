@@ -11,6 +11,7 @@ const App = () => {
   const { user, loading } = useAuth();
 
   if (loading) {
+    // Only show spinner for initial session check
     return (
       <div className="d-flex justify-content-center align-items-center vh-100">
         <div className="spinner-border text-primary"></div>
@@ -23,7 +24,6 @@ const App = () => {
       <Route path="/" element={!user ? <LoginPage /> : <Navigate to={`/${user.role}`} replace />} />
       <Route path="/signup" element={<SignupPage />} />
 
-      {/* Protected Routes */}
       <Route
         path="/admin/*"
         element={user?.role === 'admin' ? <AdminNavbar /> : <Navigate to="/" replace />}

@@ -12,23 +12,26 @@ function Dashboard({ onTabChange }) {
     useEffect(() => {
         const fetchTotals = async () => {
             try {
-                const { data: studentsData, error: studentsError } = await supabase
+                // Students count
+                const { count: studentCount, error: studentError } = await supabase
                     .from('student')
-                    .select('profile_id', { count: 'exact' });
-                if (studentsError) console.log('Students fetch error:', studentsError);
-                else setTotalStudents(studentsData?.length || 0);
+                    .select('*', { count: 'exact' }); // <-- fixed
+                if (studentError) console.log('Students fetch error:', studentError);
+                else setTotalStudents(studentCount || 0);
 
-                const { data: orgData, error: orgError } = await supabase
+                // Organizations count
+                const { count: orgCount, error: orgError } = await supabase
                     .from('organization')
-                    .select('id', { count: 'exact' });
+                    .select('*', { count: 'exact' }); // <-- fixed
                 if (orgError) console.log('Organizations fetch error:', orgError);
-                else setTotalOrganizations(orgData?.length || 0);
+                else setTotalOrganizations(orgCount || 0);
 
-                const { data: eventData, error: eventError } = await supabase
+                // Events count
+                const { count: eventCount, error: eventError } = await supabase
                     .from('event')
-                    .select('event_id', { count: 'exact' });
+                    .select('*', { count: 'exact' }); // <-- fixed
                 if (eventError) console.log('Events fetch error:', eventError);
-                else setTotalEvents(eventData?.length || 0);
+                else setTotalEvents(eventCount || 0);
 
             } catch (err) {
                 console.error('Fetch totals error:', err);
@@ -42,20 +45,20 @@ function Dashboard({ onTabChange }) {
     useEffect(() => {
         const fetchAdminName = async () => {
             try {
-                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-                if (sessionError || !session) {
+                const { data, error: sessionError } = await supabase.auth.getSession();
+                if (sessionError || !data?.session) {
                     console.log("Session missing or error:", sessionError);
                     return;
                 }
 
-                const user = session.user;
+                const user = data.session.user;
 
-                // Get account
+                // Get account linked to auth
                 const { data: accountData, error: accError } = await supabase
                     .from('account')
                     .select('account_id')
                     .eq('auth_id', user.id)
-                    .single();
+                    .maybeSingle();
                 if (accError || !accountData) {
                     console.log("Account not found:", accError);
                     return;
@@ -66,7 +69,7 @@ function Dashboard({ onTabChange }) {
                     .from('admin')
                     .select('name')
                     .eq('account_id', accountData.account_id)
-                    .single();
+                    .maybeSingle();
                 if (adminError || !adminData) {
                     console.log("Admin profile not found:", adminError);
                     return;
@@ -86,7 +89,6 @@ function Dashboard({ onTabChange }) {
 
     return (
         <div className="mt-5 container-fluid">
-
             {/* Welcome */}
             <div className="row">
                 <div className="col-lg-12 mt-3">
@@ -97,35 +99,32 @@ function Dashboard({ onTabChange }) {
 
             {/* Dashboard Boxes */}
             <div className="row mt-5 pt-5">
-
-                <div className="col-lg-4 col-md-6 mt-3">
+                <div className="col-lg-4 mt-3">
                     <div className="dashboard-box p-4 text-center shadow-lg">
                         <h4 className="fw-bold">Students</h4>
                         <h1 className="mt-5 fw-bold">{totalStudents}</h1>
                     </div>
                 </div>
 
-                <div className="col-lg-4 col-md-6 mt-3">
+                <div className="col-lg-4 mt-3">
                     <div className="dashboard-box p-4 text-center shadow-lg">
                         <h4 className="fw-bold">Organizations</h4>
                         <h1 className="mt-5 fw-bold">{totalOrganizations}</h1>
                     </div>
                 </div>
 
-                <div className="col-lg-4 col-md-6 mt-3">
+                <div className="col-lg-4 mt-3">
                     <div className="dashboard-box p-4 text-center shadow-lg">
                         <h4 className="fw-bold">Events</h4>
                         <h1 className="mt-5 fw-bold">{totalEvents}</h1>
                     </div>
                 </div>
-
             </div>
 
             {/* Buttons */}
             <div className="row my-5 pt-lg-4 text-center">
-
                 <div className="col-lg-6 col-md-12 mt-3">
-                    <button 
+                    <button
                         className="create-btn py-3 px-5 btn-transform"
                         onClick={goToCreateOrg}
                     >
@@ -134,16 +133,14 @@ function Dashboard({ onTabChange }) {
                 </div>
 
                 <div className="col-lg-6 col-md-12 mt-3">
-                    <button 
+                    <button
                         className="create-btn py-3 px-5 btn-transform"
                         onClick={goToCreateStudent}
                     >
                         <h4 className="fw-bold">Create Student Account</h4>
                     </button>
                 </div>
-
             </div>
-
         </div>
     );
 }

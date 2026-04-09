@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import '../Styles/Navbar.css';
+import 'bootstrap/dist/css/bootstrap.min.css'; // first
+import 'bootstrap/dist/js/bootstrap.bundle.min.js'; // second
+import '../Styles/Navbar.css'; // last
 import logo from '../img/logo/E-Reg.png';
 
 // Import your icon images
@@ -19,6 +21,10 @@ import OrgMembers from '../Pages/Organization/OrgMembers';
 import EventView from '../Pages/Organization/EventView';
 import Profile from '../Pages/Organization/Profile';
 import EditEvent from '../Pages/Organization/EditEvent';
+
+import 'bootstrap/dist/css/bootstrap.min.css'; // ✅ MUST be first
+import 'bootstrap/dist/js/bootstrap.bundle.min.js'; // JS for components like dropdowns, modals
+import '../Styles/Navbar.css'; 
 
 const Navbar = () => {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);

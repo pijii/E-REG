@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+// src/Pages/Student.jsx
+import React, { useState, useEffect } from 'react';
 import '../../Styles/Admin.css';
 import * as XLSX from 'xlsx';
+import { supabase } from '../../supabaseClient';
 
 function Student() {
   const [students, setStudents] = useState([]);
@@ -17,83 +19,137 @@ function Student() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
-  // Excel upload
+  // EMAIL FORMAT: first letter of first name + full last name + 3 digits + @ereg.com
+  const generateEmail = (fullName) => {
+    if (!fullName) return '';
+    const parts = fullName.trim().toLowerCase().split(' ');
+    const firstLetter = parts[0]?.charAt(0) || '';
+    const lastName = parts.slice(1).join('') || '';
+    const randomNum = Math.floor(100 + Math.random() * 900);
+    return `${firstLetter}${lastName}${randomNum}@ereg.com`;
+  };
+
+  // Fetch all students from database
+  useEffect(() => {
+    fetchStudents();
+  }, []);
+
+  const fetchStudents = async () => {
+    const { data, error } = await supabase.from('student').select('*').order('id', { ascending: true });
+    if (error) console.log(error);
+    else setStudents(data.map(s => ({
+      id: s.id,
+      studentId: s.student_id,
+      name: s.name,
+      department: s.department,
+      year: s.year,
+      section: s.section,
+      organization: s.organization || 'None'
+    })));
+  };
+
+  // Excel Upload → insert to DB
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       const data = new Uint8Array(evt.target.result);
       const workbook = XLSX.read(data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
-      const formattedData = jsonData.map((row, index) => ({
-        id: students.length + index + 1,
-        studentId: row["Student ID"],
-        name: row["Student Name"],
-        department: row["Department"],
-        year: row["Year Level"],
-        section: row["Section"],
-        organization: row["Organization"] || "None"
+
+      const formattedData = jsonData.map(row => ({
+        student_id: row['Student ID'],
+        name: row['Student Name'],
+        department: row['Department'],
+        year: row['Year Level'],
+        section: row['Section'],
+        organization: row['Organization'] || 'None'
       }));
-      setStudents(prev => [...prev, ...formattedData]);
+
+      const { error } = await supabase.from('student').insert(formattedData);
+      if (error) console.log(error);
+      else fetchStudents();
     };
+
     reader.readAsArrayBuffer(file);
   };
 
+  // Input change handler
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Add student (show confirmation modal)
   const handleAddStudent = (e) => {
     e.preventDefault();
     const { studentId, name, department, year, section } = formData;
     if (!studentId || !name || !department || !year || !section) {
-      alert("Please fill in all required fields!");
+      alert('Please fill all required fields');
       return;
     }
     setShowAddConfirm(true);
   };
 
-  const confirmAddStudent = () => {
-    setStudents(prev => [
-      ...prev,
-      { id: prev.length + 1, ...formData, organization: formData.organization || "None" }
-    ]);
-    setFormData({ studentId: '', name: '', department: '', year: '', section: '', organization: '' });
+  // Confirm add → insert into DB
+  const confirmAddStudent = async () => {
+    const { studentId, name, department, year, section, organization } = formData;
+
+    const { error } = await supabase.from('student').insert([{
+      student_id: studentId,
+      name,
+      department,
+      year,
+      section,
+      organization: organization || 'None'
+    }]);
+
+    if (error) console.log(error);
+    else fetchStudents();
+
+    setFormData({ studentId:'', name:'', department:'', year:'', section:'', organization:'' });
     setShowAddConfirm(false);
   };
 
-  const handleEditSave = () => {
-    setStudents(prev =>
-      prev.map(s => s.id === selectedStudent.id ? selectedStudent : s)
-    );
+  // Edit / Save
+  const handleEditSave = async () => {
+    const { error } = await supabase.from('student').update({
+      student_id: selectedStudent.studentId,
+      name: selectedStudent.name,
+      department: selectedStudent.department,
+      year: selectedStudent.year,
+      section: selectedStudent.section,
+      organization: selectedStudent.organization
+    }).eq('id', selectedStudent.id);
+
+    if (error) console.log(error);
+    else fetchStudents();
     setSelectedStudent(null);
   };
 
-  const handleDelete = () => {
-    setStudents(prev => prev.filter(s => s.id !== selectedStudent.id));
+  // Delete
+  const handleDelete = async () => {
+    const { error } = await supabase.from('student').delete().eq('id', selectedStudent.id);
+    if (error) console.log(error);
+    else fetchStudents();
     setSelectedStudent(null);
   };
 
-  // --- SEARCH ---
+  // SEARCH
   const filteredStudents = students.filter(s =>
-    Object.keys(s).some(key => {
-      if (['id', 'studentId', 'name', 'department', 'year', 'section', 'organization'].includes(key)) {
-        return s[key].toString().toLowerCase().includes(searchTerm.toLowerCase());
-      }
-      return false;
-    })
+    Object.values(s).some(val =>
+      val?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+    )
   );
 
-  // --- SORT ---
+  // SORT
   const sortedStudents = [...filteredStudents].sort((a, b) => {
     if (!sortConfig.key) return 0;
-    const key = sortConfig.key;
-    let valA = a[key];
-    let valB = b[key];
+    let valA = a[sortConfig.key];
+    let valB = b[sortConfig.key];
     if (typeof valA === 'string') valA = valA.toLowerCase();
     if (typeof valB === 'string') valB = valB.toLowerCase();
     if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -107,21 +163,23 @@ function Student() {
     setSortConfig({ key, direction });
   };
 
-  // --- DOWNLOAD CURRENT TABLE ---
+  // Download table with email + random password
   const downloadCurrentTable = () => {
     const exportData = sortedStudents.map(s => ({
-      "Student ID": s.studentId,
-      "Name": s.name,
-      "Section": s.section,
-      "Email": `${s.studentId}@school.com`,
-      "Password": Math.random().toString(36).slice(-6)
+      'Student ID': s.studentId,
+      'Name': s.name,
+      'Section': s.section,
+      'Email': generateEmail(s.name),
+      'Password': Math.random().toString(36).slice(-6)
     }));
+
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
-    XLSX.writeFile(workbook, "Students.xlsx");
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
+    XLSX.writeFile(workbook, 'Students.xlsx');
   };
 
+  // ❗ YOUR DESIGN REMAINS EXACTLY THE SAME BELOW
   return (
     <div className="container-fluid">
       <h2 className="fw-bold mb-3">Student Management</h2>
@@ -164,10 +222,9 @@ function Student() {
           </div>
         </div>
 
-        {/* Right Column: Search + Table */}
+        {/* Right Column */}
         <div className="col-lg-8 col-md-12 mt-3 mt-lg-0">
           <div className="member-box bg-red">
-            {/* Search */}
             <div className="mb-2 d-flex gap-2">
               <input
                 type="text"
@@ -246,8 +303,6 @@ function Student() {
         </>
       )}
 
-      {/* View, Edit, Delete Modals remain unchanged */}
-      {/* ... same as before ... */}
     </div>
   );
 }
