@@ -119,3 +119,76 @@
     background-color: #850101;
     color: white;
 }
+
+/* Table Layout Improvements */
+.member-box {
+  border: 1px solid #850101;
+}
+
+.header-row {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.hover-row:hover {
+  background-color: #f8f9fa !important;
+  transition: background-color 0.2s ease;
+}
+
+/* Modal Overlay - Fixes it to the center of the viewport */
+.modal-custom-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px); /* Modern blur effect */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000; /* High enough to top everything */
+  animation: fadeIn 0.2s ease;
+}
+
+/* Modal Box */
+.modal-custom-box {
+  background: white;
+  width: 90%;
+  max-width: 400px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  animation: slideUp 0.3s ease-out;
+}
+
+.modal-custom-header {
+  padding: 20px 20px 10px;
+  font-size: 1.2rem;
+}
+
+.modal-custom-body {
+  padding: 10px 20px 20px;
+  font-size: 1rem;
+  color: #333;
+}
+
+.modal-custom-footer {
+  background: #f8f9fa;
+  padding: 15px 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}

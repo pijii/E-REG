@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../supabaseClient'; 
 import logo from '../img/logo/E-Reg.png';
 
 // Icons
@@ -30,6 +31,11 @@ const AdminNavbar = () => {
   // UI States
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  // Notification States
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: dashboardIcon },
@@ -43,9 +49,75 @@ const AdminNavbar = () => {
   const account = user?.account;
   const adminName = adminProfile?.name || account?.email || 'Administrator';
   const profileImage = adminProfile?.profile_img || defaultProfileIcon;
-
-  // Final expansion logic
   const isExpanded = isManuallyOpen || isHovered;
+
+  /**
+   * 1. Fetch initial notifications
+   */
+  const fetchNotifications = async () => {
+    if (!user?.account?.id) return;
+    
+    console.log("Fetching notifications for ID:", user.account.id);
+    const { data, error } = await supabase
+      .from('notification')
+      .select('*')
+      .eq('user_id', user.account.id)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (error) {
+      console.error("Fetch Error:", error.message);
+    } else {
+      setNotifications(data || []);
+      setUnreadCount(data.filter(n => !n.is_read).length);
+    }
+  };
+
+  /**
+   * 2. Real-time Subscription
+   */
+  useEffect(() => {
+    if (!user?.account?.id) return;
+
+    fetchNotifications();
+
+    // Subscribe to new notification inserts for this specific user
+    const channel = supabase
+      .channel(`user-notifs-${user.account.id}`)
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'notification', 
+          filter: `user_id=eq.${user.account.id}` 
+        }, 
+        (payload) => {
+          console.log("New Real-time Notification:", payload.new);
+          setNotifications(prev => [payload.new, ...prev].slice(0, 10));
+          setUnreadCount(prev => prev + 1);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.account?.id]);
+
+  /**
+   * 3. Mark notification as read
+   */
+  const handleMarkAsRead = async (id) => {
+    const { error } = await supabase
+      .from('notification')
+      .update({ is_read: true })
+      .eq('id', id);
+
+    if (!error) {
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    }
+  };
 
   const toggleSidebar = (e) => {
     e.stopPropagation();
@@ -54,32 +126,14 @@ const AdminNavbar = () => {
 
   const handleMouseEnter = () => {
     setIsHovered(true);
-    if (isManuallyOpen) {
-      setIsManuallyOpen(false);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    setIsHovered(false);
+    if (isManuallyOpen) setIsManuallyOpen(false);
   };
 
   const handleLinkClick = (tab) => {
     setActiveTab(tab);
-    if (window.innerWidth <= 600) {
-      setIsManuallyOpen(false);
-    }
+    if (window.innerWidth <= 600) setIsManuallyOpen(false);
   };
 
-  // Close notifications if clicking outside
-  useEffect(() => {
-    const closePanels = () => setIsNotificationOpen(false);
-    if (isNotificationOpen) {
-      window.addEventListener('click', closePanels);
-    }
-    return () => window.removeEventListener('click', closePanels);
-  }, [isNotificationOpen]);
-
-  // Document Title Effect
   useEffect(() => {
     const titles = {
       dashboard: 'E-Reg | Admin Dashboard',
@@ -94,7 +148,6 @@ const AdminNavbar = () => {
 
   return (
     <>
-      {/* Top Navbar */}
       <nav className="top-navbar">
         <div className="navbar-left">
           <button className="sidebar-toggle-top" onClick={toggleSidebar}>
@@ -125,13 +178,31 @@ const AdminNavbar = () => {
               onClick={() => setIsNotificationOpen(!isNotificationOpen)}
             >
               <img src={notificationIcon} alt="Bell" className="nav-icon-img" />
+              {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
             </button>
 
             {isNotificationOpen && (
-              <div className="notification-dropdown">
-                <div className="dropdown-header">Notifications</div>
-                <div className="dropdown-body no-notif">
-                   No notifications
+              <div className="notification-dropdown shadow border-0">
+                <div className="dropdown-header fw-bold">Notifications</div>
+                <div className="dropdown-body">
+                  {notifications.length > 0 ? (
+                    notifications.map(n => (
+                      <div 
+                        key={n.id} 
+                        className={`notification-item p-2 border-bottom ${!n.is_read ? 'unread-notif' : ''}`}
+                        onClick={() => handleMarkAsRead(n.id)}
+                        style={{cursor: 'pointer'}}
+                      >
+                        <div className="fw-bold small">{n.title}</div>
+                        <div className="text-muted extra-small">{n.message}</div>
+                        <div className="text-end" style={{fontSize: '9px'}}>
+                          {new Date(n.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-3 text-center text-muted">No new notifications</div>
+                  )}
                 </div>
               </div>
             )}
@@ -139,16 +210,10 @@ const AdminNavbar = () => {
         </div>
       </nav>
 
-      {/* Overlay to close sidebar on mobile when clicking outside */}
-      {isManuallyOpen && window.innerWidth <= 600 && (
-        <div className="sidebar-overlay" onClick={() => setIsManuallyOpen(false)} />
-      )}
-
-      {/* Sidebar */}
       <div
         className={`sidebar-wrapper ${isExpanded ? 'expanded' : 'collapsed'}`}
         onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        onMouseLeave={() => setIsHovered(false)}
       >
         <div className="sidebar">
           {menuItems.map(item => (
@@ -161,15 +226,13 @@ const AdminNavbar = () => {
               <span className="label">{item.label}</span>
             </button>
           ))}
-
-          <button className="sidebar-link logout" onClick={() => logout()}>
+          <button className="sidebar-link logout" onClick={() => setShowLogoutModal(true)}>
             <img src={logoutIcon} alt="Logout" className="sidebar-icon-img" />
             <span className="label">Log out</span>
           </button>
         </div>
       </div>
 
-      {/* Main Content Area */}
       <div className={`content-wrapper ${isExpanded ? 'expanded' : 'collapsed'}`}>
         {activeTab === 'dashboard' && <Dashboard onTabChange={setActiveTab} />}
         {activeTab === 'students' && <Students />}
@@ -178,6 +241,19 @@ const AdminNavbar = () => {
         {activeTab === 'reports' && <Reports />}
         {activeTab === 'profile' && <Profile />}
       </div>
+
+      {showLogoutModal && (
+        <div className="modal-overlay">
+          <div className="logout-modal p-4 text-center">
+            <h4 className="fw-bold">Confirm Logout</h4>
+            <p className="text-secondary">Are you sure you want to sign out?</p>
+            <div className="d-flex gap-2 justify-content-center mt-3">
+              <button className="btn btn-light px-4" onClick={() => setShowLogoutModal(false)}>Cancel</button>
+              <button className="btn btn-danger px-4" onClick={logout}>Log Out</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
