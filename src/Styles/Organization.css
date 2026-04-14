@@ -81,7 +81,7 @@
 }
 
 .event-image:hover, .btn-transform:hover {
-  transform: scale(1.1); /* Enlarges by 50% */
+  transform: scale(1.03); /* Enlarges by 50% */
 }
 
 .member-box {

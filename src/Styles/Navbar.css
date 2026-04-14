@@ -1,5 +1,5 @@
 /* --- Global --- */
-* { font-family: 'antonio', sans-serif; box-sizing: border-box; }
+* { font-family: 'arial', sans-serif; box-sizing: border-box; }
 body { margin: 0; background-color: #f8f8f8; }
 
 /* --- Top Navbar --- */
@@ -30,9 +30,9 @@ body { margin: 0; background-color: #f8f8f8; }
 .notification-wrapper { position: relative; }
 .notification-dropdown {
   position: absolute; top: 60px; right: 0; 
-  width: 250px; background-color: white; border-radius: 12px;
+  width: 370px; background-color: white; border-radius: 12px;
   box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 1200;
-  overflow: hidden; animation: dropdownFade 0.2s ease-out;
+  overflow: hidden; animation: dropdownFade 0.2s ease-out; padding: 15px;
 }
 @keyframes dropdownFade {
   from { opacity: 0; transform: translateY(-10px); }
@@ -108,6 +108,7 @@ body { margin: 0; background-color: #f8f8f8; }
   .notification-dropdown {
     width: calc(100vw - 30px);
     max-width: 300px;
+    max-height: 700px;
     right: -10px;
   }
 
@@ -176,4 +177,59 @@ body { margin: 0; background-color: #f8f8f8; }
 
 .btn-confirm-logout:hover {
   background: #c82333;
+}
+
+/* --- Notifications Dropdown --- */
+.notification-dropdown {
+  position: absolute;
+  top: 60px;
+  right: 0;
+  width: 370px;
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  z-index: 1200;
+  overflow: hidden; /* Keeps the header and body contained */
+  animation: dropdownFade 0.2s ease-out;
+}
+
+/* --- Scrollable Body --- */
+.dropdown-body {
+  max-height: 400px; /* Set your desired height here */
+  overflow-y: auto;  /* Enables vertical scrolling */
+  padding: 5px 0;    /* Optional: padding for the list */
+}
+
+/* Custom Scrollbar Styling (Optional - for a cleaner look) */
+.dropdown-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dropdown-body::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.dropdown-body::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 10px;
+}
+
+.dropdown-body::-webkit-scrollbar-thumb:hover {
+  background: #850101; /* Matches your theme color */
+}
+
+/* --- Individual Item Styling --- */
+.notification-item {
+  padding: 15px;
+  border-bottom: 1px solid #eee;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+
+.notification-item:hover {
+  background-color: #f9f9f9;
+}
+
+.notification-item.unread {
+  background-color: #fff8f8; /* Light red tint for unread */
 }

@@ -55,13 +55,12 @@ const AdminNavbar = () => {
    * 1. Fetch initial notifications
    */
   const fetchNotifications = async () => {
-    if (!user?.account?.id) return;
+    if (!user?.account?.account_id) return; // Matches your table schema 'account_id'
     
-    console.log("Fetching notifications for ID:", user.account.id);
     const { data, error } = await supabase
       .from('notification')
       .select('*')
-      .eq('user_id', user.account.id)
+      .eq('user_id', user.account.account_id)
       .order('created_at', { ascending: false })
       .limit(10);
 
@@ -77,22 +76,20 @@ const AdminNavbar = () => {
    * 2. Real-time Subscription
    */
   useEffect(() => {
-    if (!user?.account?.id) return;
+    if (!user?.account?.account_id) return;
 
     fetchNotifications();
 
-    // Subscribe to new notification inserts for this specific user
     const channel = supabase
-      .channel(`user-notifs-${user.account.id}`)
+      .channel(`user-notifs-${user.account.account_id}`)
       .on('postgres_changes', 
         { 
           event: 'INSERT', 
           schema: 'public', 
           table: 'notification', 
-          filter: `user_id=eq.${user.account.id}` 
+          filter: `user_id=eq.${user.account.account_id}` 
         }, 
         (payload) => {
-          console.log("New Real-time Notification:", payload.new);
           setNotifications(prev => [payload.new, ...prev].slice(0, 10));
           setUnreadCount(prev => prev + 1);
         }
@@ -102,7 +99,7 @@ const AdminNavbar = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.account?.id]);
+  }, [user?.account?.account_id]);
 
   /**
    * 3. Mark notification as read
@@ -114,7 +111,9 @@ const AdminNavbar = () => {
       .eq('id', id);
 
     if (!error) {
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+      setNotifications(prev => 
+        prev.map(n => n.id === id ? { ...n, is_read: true } : n)
+      );
       setUnreadCount(prev => Math.max(0, prev - 1));
     }
   };

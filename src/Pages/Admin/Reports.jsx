@@ -28,7 +28,7 @@ function Reports() {
         .from('event')
         .select(`
           *, 
-          organization:event_creator_id ( 
+          organization ( 
             name,
             account_id
           )
@@ -54,11 +54,10 @@ function Reports() {
 
   /**
    * Helper function to insert notifications.
-   * accountId: BIGINT reference to account table
    */
   const sendNotification = async (accountId, title, message, type = 'system') => {
-    if (!accountId || !title || !message) {
-      console.warn("Notification skipped: Missing Title, Message, or ID.");
+    if (!accountId) {
+      console.warn(`Notification skipped: No account ID found for title: "${title}"`);
       return; 
     }
 
@@ -75,6 +74,7 @@ function Reports() {
       ]);
 
       if (error) throw error;
+      console.log(`Notification sent to Account ${accountId}: ${title}`);
     } catch (err) {
       console.error("Supabase Notification Error:", err.message);
     }
@@ -93,20 +93,15 @@ function Reports() {
 
       if (error) throw error;
 
+      // NOTIFY THE ORGANIZATION
       const targetAccountId = event.organization?.account_id;
-      const actionTitle = newStatus ? "Event Approved" : "Event Revoked";
-      const actionMessage = newStatus 
-        ? `Great news! Your event "${event.title || 'Untitled'}" has been approved by the admin.` 
-        : `Attention: The approval for your event "${event.title || 'Untitled'}" has been revoked by the admin.`;
-
-      // NOTIFY THE ORGANIZATION OF THE APPROVAL/REVOKE
       if (targetAccountId) {
-        await sendNotification(
-          targetAccountId, 
-          actionTitle, 
-          actionMessage, 
-          'approval'
-        );
+        const actionTitle = newStatus ? "Event Approved" : "Event Revoked";
+        const actionMessage = newStatus 
+          ? `Great news! Your event "${event.title}" has been approved by the admin.` 
+          : `The approval for your event "${event.title}" has been revoked by the admin.`;
+
+        await sendNotification(targetAccountId, actionTitle, actionMessage, 'approval');
       }
 
       setEvents(events.map(e => e.event_id === event.event_id ? { ...e, is_approve: newStatus } : e));
@@ -125,21 +120,21 @@ function Reports() {
       const orgAccountId = eventToDelete.organization?.account_id;
       const eventTitle = eventToDelete.title || "Untitled Event";
 
-      // 1. Fetch joined students' account_ids so we can notify them before event is gone
+      // 1. Fetch joined students' account_ids before deleting the event
       const { data: participants } = await supabase
         .from('event_participants')
         .select(`
-          student:student_id (
+          student (
             account_id
           )
         `)
         .eq('event_id', eventId);
 
-      // 2. Delete the event
+      // 2. Delete the event record
       const { error } = await supabase.from('event').delete().eq('event_id', eventId);
       if (error) throw error;
 
-      // 3. NOTIFY THE ORGANIZATION OF DELETION
+      // 3. NOTIFY THE ORGANIZATION
       if (orgAccountId) {
         await sendNotification(
           orgAccountId, 
@@ -149,26 +144,25 @@ function Reports() {
         );
       }
 
-      // 4. NOTIFY ALL JOINED STUDENTS
+      // 4. NOTIFY ALL REGISTERED STUDENTS
       if (participants && participants.length > 0) {
-        await Promise.all(participants.map(p => {
-          if (p.student?.account_id) {
-            return sendNotification(
-              p.student.account_id,
-              "Event Cancelled",
-              `The event "${eventTitle}" has been cancelled and removed by the administrator.`,
-              'alert'
-            );
-          }
-          return null;
-        }));
+        const studentNotifications = participants
+          .filter(p => p.student?.account_id)
+          .map(p => sendNotification(
+            p.student.account_id,
+            "Event Cancelled",
+            `The event "${eventTitle}" you joined has been cancelled by the administrator.`,
+            'alert'
+          ));
+        
+        await Promise.all(studentNotifications);
       }
 
       setEvents(events.filter(e => e.event_id !== eventId));
       setShowDeleteModal(false);
       setEventToDelete(null);
     } catch (err) {
-      alert("Error: " + err.message);
+      alert("Error deleting event: " + err.message);
     }
   };
 
@@ -176,7 +170,7 @@ function Reports() {
 
   return (
     <div className="container-fluid py-4 px-md-4">
-      <h2 className="fw-bold mb-4">System Reports</h2>
+      <h2 className="fw-bold mb-4 text-dark">System Reports</h2>
 
       {/* METRICS */}
       <div className="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-5">
@@ -298,11 +292,11 @@ function Reports() {
                 <button type="button" className="btn-close btn-close-white" onClick={() => setShowDeleteModal(false)}></button>
               </div>
               <div className="modal-body p-4 text-center">
-                <p>Delete <strong>{eventToDelete?.title || "this event"}</strong>?</p>
+                <p>Are you sure you want to delete <strong>{eventToDelete?.title}</strong>? This will notify the organization and all registered students.</p>
               </div>
               <div className="modal-footer border-0 pb-4 justify-content-center">
                 <button className="btn btn-secondary px-4" onClick={() => setShowDeleteModal(false)}>Cancel</button>
-                <button className="btn btn-danger px-4" onClick={confirmDelete}>Delete</button>
+                <button className="btn btn-danger px-4" onClick={confirmDelete}>Delete Event</button>
               </div>
             </div>
           </div>

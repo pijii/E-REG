@@ -192,3 +192,85 @@
   from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
+
+.avatar-wrapper:hover .change-photo-overlay {
+                    opacity: 1 !important;
+                }
+                .animate-fade-in {
+                    animation: fadeIn 0.3s ease-in-out;
+                }
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+
+.btn-mark-read {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 20px;
+    transition: all 0.2s;
+}
+
+.btn-mark-read:hover {
+    background-color: #dc3545;
+    color: white;
+}
+
+/* --- Change Photo Container --- */
+.avatar-wrapper {
+    height: 180px;
+    width: 180px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    background-color: #2c2c2c;
+    transition: transform 0.2s ease;
+    cursor: pointer;
+}
+
+/* Hover Effect for the Container */
+.avatar-wrapper:hover {
+    transform: scale(1.02);
+}
+
+/* --- The "Change Photo" Overlay --- */
+.change-photo-overlay {
+    position: absolute;
+    inset: 0; /* Covers the entire wrapper */
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    opacity: 0; /* Hidden by default */
+    transition: opacity 0.2s ease-in-out;
+}
+
+/* Reveal Overlay on Hover */
+.avatar-wrapper:hover .change-photo-overlay {
+    opacity: 1 !important;
+}
+
+/* Icon and Text inside Overlay */
+.change-photo-overlay i {
+    font-size: 2rem;
+    margin-bottom: 5px;
+}
+
+.change-photo-overlay span {
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+/* --- Loading Spinner Background --- */
+.bg-secondary {
+    background-color: #6c757d !important;
+}
+
+/* Ensure the image fills the container correctly */
+.object-fit-cover {
+    object-fit: cover;
+}
