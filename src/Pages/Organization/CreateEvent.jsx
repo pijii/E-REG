@@ -1,8 +1,11 @@
 import { useState, useRef } from 'react';
 import { supabase } from '../../supabaseClient'; 
+import { useAuth } from '../../context/AuthContext'; 
 import '../../Styles/Organization.css';
 
 function CreateEvent({ onTabChange }) {
+    const { user: authUser } = useAuth();
+
     // Form States
     const [title, setTitle] = useState("");
     const [category, setCategory] = useState("");
@@ -40,36 +43,34 @@ function CreateEvent({ onTabChange }) {
 
     const handleCreateEvent = async (e) => {
         if (e) e.preventDefault();
+        
+        // Ensure we are pulling the ID from the 'organization' table row
+        // In your AuthContext, this is stored in 'profile'
+        const creatorOrgId = authUser?.profile?.org_id || authUser?.profile?.id; 
+
+        if (!creatorOrgId) {
+            console.error("AuthUser Object:", authUser);
+            alert("Error: Organization profile not found. Check if the 'organization' table has a record for this account.");
+            return;
+        }
+
         setLoading(true);
 
         try {
-            // 1. Get the current logged-in user's session
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
-            if (authError || !user) throw new Error("User not authenticated");
-
-            // 2. Fetch the creator's school_id and account_id from the account table
-            const { data: userData, error: userFetchError } = await supabase
-                .from('account')
-                .select('account_id, school_id')
-                .eq('auth_id', user.id)
-                .single();
-
-            if (userFetchError || !userData) throw new Error("Could not find user profile or school association.");
-
-            // 3. Handle Image Upload to EventPoster bucket
+            // 1. Upload Poster
             let posterUrl = "";
             if (posterFile) {
                 const fileExt = posterFile.name.split('.').pop();
                 const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
                 
                 const { error: uploadError } = await supabase.storage
-                    .from('EventPoster')
+                    .from('EventsPoster')
                     .upload(fileName, posterFile);
                 
                 if (uploadError) throw uploadError;
                 
                 const { data: urlData } = supabase.storage
-                    .from('EventPoster')
+                    .from('EventsPoster')
                     .getPublicUrl(fileName);
                 
                 posterUrl = urlData.publicUrl;
@@ -77,38 +78,34 @@ function CreateEvent({ onTabChange }) {
 
             const generatedCode = generateEventCode();
 
-            // 4. Insert Event using the creator's school_id and account_id
-            const { data: eventData, error: eventError } = await supabase
+            // 2. Insert into 'event' table
+            const { error: eventError } = await supabase
                 .from('event')
                 .insert([{
                     title,
                     category,
-                    mode: eventMode,
+                    mode: eventMode, // 'face-to-face' or 'online'
                     team_match: teamMatch === "yes",
                     team_size: teamMatch === "yes" ? parseInt(teamSize) : null,
                     max_team: teamMatch === "yes" ? parseInt(maxCapacity) : null,
                     max_participants: teamMatch === "no" ? parseInt(maxCapacity) : null,
                     date: `${eventDate}T${eventTime}`,
-                    venue: eventMode === "faceToFace" ? venue : "Online",
+                    venue: eventMode === "face-to-face" ? venue : "Online",
                     description,
                     poster: posterUrl,
                     event_code: generatedCode,
                     is_approve: false,
-                    // Use organization ID if your table links to organization.id, 
-                    // or use account_id/school_id as per your event table structure
-                    event_creator_id: userData.account_id 
-                }])
-                .select()
-                .single();
+                    event_creator_id: creatorOrgId 
+                }]);
 
             if (eventError) throw eventError;
 
-            // 5. Notify the Admin of the same school
+            // 3. Notify Admin
             const { data: adminAccount } = await supabase
                 .from('account')
                 .select('account_id')
                 .eq('role', 'admin')
-                .eq('school_id', userData.school_id) // Only notify the admin of YOUR school
+                .eq('school_id', authUser.account.school_id)
                 .limit(1)
                 .single();
 
@@ -140,21 +137,19 @@ function CreateEvent({ onTabChange }) {
             <div className="row shadow-lg form-box">
                 <form ref={formRef} onSubmit={(e) => { e.preventDefault(); setShowConfirmation(true); }}>
                     <div className="col-12 mt-4 text-center">
-                        <h2 className='fw-bold pt-3'>Create New Event</h2>
+                        <h2 className='fw-bold'>Create New Event</h2>
                         <h5 className='fw-bold mt-0'>Fill out the event information below</h5>
                     </div>
 
-                    <div className="row mt-5 d-flex p-lg-5 pb-5">
-                        {/* Event Title */}
-                        <div className="col-12 col-lg-6 mt-3">
+                    <div className="row d-flex p-lg-5">
+                        <div className="col-12 col-lg-6">
                             <h5 className='fw-bold ms-2'>Event Title:</h5>
                             <input type="text" className="form-control mx-1 px-3" 
                                 value={title} onChange={(e) => setTitle(e.target.value)}
                                 placeholder='Enter event title...' required />
                         </div>
 
-                        {/* Event Category */}
-                        <div className="col-12 col-lg-6 mt-3">
+                        <div className="col-12 col-lg-6">
                             <h5 className='fw-bold ms-2'>Event Category:</h5>
                             <select className="form-select px-3 mx-1" required value={category} onChange={(e) => setCategory(e.target.value)}>
                                 <option value="" disabled hidden>Select Category</option>
@@ -164,19 +159,17 @@ function CreateEvent({ onTabChange }) {
                             </select>
                         </div>
 
-                        {/* Event Mode */}
                         <div className="col-12 col-lg-6 mt-3">
                             <h5 className='fw-bold ms-2'>Event Mode:</h5>
                             <div className="d-flex mx-3">
                                 <input type="radio" name="eventMode" value="online" checked={eventMode === "online"} onChange={e => setEventMode(e.target.value)} required />
                                 <label className="fw-bold ms-1">Online</label>
 
-                                <input type="radio" name="eventMode" value="faceToFace" className="ms-3" checked={eventMode === "faceToFace"} onChange={e => setEventMode(e.target.value)} />
+                                <input type="radio" name="eventMode" value="face-to-face" className="ms-3" checked={eventMode === "face-to-face"} onChange={e => setEventMode(e.target.value)} />
                                 <label className="fw-bold ms-1">Face-to-Face</label>
                             </div>
                         </div>
 
-                        {/* Team Match */}
                         <div className="col-12 col-lg-6 mt-3">
                             <h5 className='fw-bold ms-2'>Team Match:</h5>
                             <div className="d-flex mx-3">
@@ -210,7 +203,7 @@ function CreateEvent({ onTabChange }) {
                             <input type="time" className="form-control mx-1 px-3" value={eventTime} onChange={(e) => setEventTime(e.target.value)} required />
                         </div>
 
-                        {eventMode === "faceToFace" && (
+                        {eventMode === "face-to-face" && (
                             <div className="col-12 col-lg-6 mt-3">
                                 <h5 className='fw-bold ms-2'>Venue:</h5>
                                 <input type="text" className="form-control mx-1 px-3" value={venue} onChange={(e) => setVenue(e.target.value)} required />

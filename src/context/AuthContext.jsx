@@ -1,4 +1,3 @@
-// AuthContext.js
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 
@@ -32,6 +31,43 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const switchToOrganization = async (orgAccountId) => {
+    setLoading(true);
+    try {
+      const { data: orgAccount, error: accError } = await supabase
+        .from('account')
+        .select('*')
+        .eq('account_id', orgAccountId)
+        .single();
+
+      if (accError) throw accError;
+
+      const { data: orgProfile, error: profError } = await supabase
+        .from('organization')
+        .select('*')
+        .eq('account_id', orgAccountId)
+        .single();
+
+      if (profError) throw profError;
+
+      const switchedUser = {
+        role: 'organization',
+        account: orgAccount,
+        profile: orgProfile,
+        isSwitched: true 
+      };
+
+      setUser(switchedUser);
+      sessionStorage.setItem('switched_org_id', orgAccountId);
+      return switchedUser;
+    } catch (err) {
+      console.error("Switching Error:", err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
 
@@ -43,8 +79,22 @@ export const AuthProvider = ({ children }) => {
         const { data: { session } } = await supabase.auth.getSession();
 
         if (session?.user && mounted) {
-          const userData = await fetchUserData(session.user.id);
-          if (mounted) setUser(userData);
+          const switchedOrgId = sessionStorage.getItem('switched_org_id');
+          
+          if (switchedOrgId) {
+            const { data: orgAccount } = await supabase.from('account').select('*').eq('account_id', switchedOrgId).single();
+            const { data: orgProfile } = await supabase.from('organization').select('*').eq('account_id', switchedOrgId).single();
+            
+            if (orgAccount && orgProfile) {
+              setUser({ role: 'organization', account: orgAccount, profile: orgProfile, isSwitched: true });
+            } else {
+              const userData = await fetchUserData(session.user.id);
+              setUser(userData);
+            }
+          } else {
+            const userData = await fetchUserData(session.user.id);
+            if (mounted) setUser(userData);
+          }
         } else if (mounted) {
           setUser(null);
         }
@@ -58,13 +108,9 @@ export const AuthProvider = ({ children }) => {
 
     initializeAuth();
 
-    // Lightweight listener - avoid deadlock
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("Auth event:", event);   // ← Check this in console!
-
       if (event === 'SIGNED_IN' && session?.user) {
         setLoading(true);
-        // Defer heavy work to prevent deadlock
         setTimeout(async () => {
           if (!mounted) return;
           const userData = await fetchUserData(session.user.id);
@@ -76,12 +122,12 @@ export const AuthProvider = ({ children }) => {
       } 
       else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
         if (mounted) {
+          sessionStorage.removeItem('switched_org_id');
           setUser(null);
           setLoading(false);
         }
       } 
       else {
-        // INITIAL_SESSION and other events
         if (mounted) setLoading(false);
       }
     });
@@ -123,6 +169,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       await supabase.auth.signOut();
+      sessionStorage.removeItem('switched_org_id');
       setUser(null);
     } finally {
       setLoading(false);
@@ -130,7 +177,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, switchToOrganization }}>
       {children}
     </AuthContext.Provider>
   );
